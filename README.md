@@ -14,7 +14,7 @@ This repository has 3 workspaces named local, docker-compose, and kubernetes. Ea
 
 Spring Cloud Config Server sources properties from the Git-backed repository inside `local/git-localconfig-repo`.
 Every runtime connects to the Config Server and exposes actuator endpoints for diagnostics.
-The Eureka naming server collects registrations from Limits Service, Currency Exchange Service, Currency Conversion Service, and API Gateway, which means client code relies on logical service identifiers instead of literal host names.
+The Eureka naming server collects registrations from Currency Exchange Service, Currency Conversion Service, and API Gateway, which means client code relies on logical service identifiers instead of literal host names.
 The API Gateway becomes the single entry point in all environments, providing proxying.
 
 ```mermaid
@@ -22,18 +22,15 @@ flowchart LR
   Client[Client] --> Gateway[API Gateway]
   Gateway --> Ex[Currency Exchange]
   Gateway --> Conv[Currency Conversion]
-  Gateway --> Limits[Limits Service]
 
   Repo[Git Config Repo] --> Config[Config Server]
   Config --> Ex
   Config --> Conv
-  Config --> Limits
   Config --> Gateway
   Config --> Eureka[Naming Server]
 
   Ex -- register --> Eureka
   Conv -- register --> Eureka
-  Limits -- register --> Eureka
   Gateway -- register --> Eureka
 ```
 
@@ -43,20 +40,19 @@ flowchart LR
 | ----------------------------------- | ---- | ------------------------------------------------------------------------------------------------------------- |
 | `local/spring-cloud-config-server`  | 8888 | Shares configuration from `local/git-localconfig-repo`.                                                       |
 | `local/naming-server`               | 8761 | The Eureka service, which is the discovery server so that every service can register and locate one another.  |
-| `local/limits-service`              | 8080 | Reads `limits-service.minimum` and `limits-service.maximum` via Spring Cloud Config.                          |
 | `local/currency-exchange-service`   | 8000 | Provides currency exchange from the in-memory H2 database.                                                    |
 | `local/currency-conversion-service` | 8100 | The business logic is here, which will call currency-exchange-service to get the currency and then calculate. |
 | `local/api-gateway`                 | 8765 | The gateway that provides different entry points for APIs.                                                    |
 
 ## Workspace Components
 
-| Workspace         | Config Server | Eureka | API Gateway | Limits | Exchange | Conversion | Config Source                                  |
-| ----------------- | ------------- | ------ | ----------- | ------ | -------- | ---------- | ---------------------------------------------- |
-| `local/`          | Yes           | Yes    | Yes         | Yes    | Yes      | Yes        | `local/git-localconfig-repo` via Config Server |
-| `docker-compose/` | No            | Yes    | Yes         | No     | Yes      | Yes        | `application.properties` in every service      |
-| `kubernetes/`     | No            | No     | No          | No     | Yes      | Yes        | App config + ConfigMap in `deployment.yaml`    |
+| Workspace         | Config Server | Eureka | API Gateway | Exchange | Conversion | Config Source                                  |
+| ----------------- | ------------- | ------ | ----------- | -------- | ---------- | ---------------------------------------------- |
+| `local/`          | Yes           | Yes    | Yes         | Yes      | Yes        | `local/git-localconfig-repo` via Config Server |
+| `docker-compose/` | No            | Yes    | Yes         | Yes      | Yes        | `application.properties` in every service      |
+| `kubernetes/`     | No            | No     | No          | Yes      | Yes        | App config + ConfigMap in `deployment.yaml`    |
 
-In Docker, the environment only keeps the required services for the request flow, so Config Server and Limits Service are removed.
+In Docker, the environment only keeps the required services for the request flow, so the Config Server is removed.
 In Kubernetes, Service discovery and Ingress are used, so Config Server, Eureka, and Gateway are not included.
 
 ## Environment
@@ -86,10 +82,6 @@ mvn spring-boot:run
 Start each backend service in its own terminal:
 
 ```bash
-cd local/limits-service && mvn spring-boot:run
-```
-
-```bash
 cd local/currency-exchange-service && mvn spring-boot:run
 ```
 
@@ -100,7 +92,6 @@ cd local/currency-conversion-service && mvn spring-boot:run
 Test the APIs to check if they can be called:
 
 ```bash
-curl http://localhost:8080/limits
 curl http://localhost:8000/currency-exchange/from/USD/to/TWD
 curl http://localhost:8100/currency-conversion/from/USD/to/TWD/quantity/10
 curl http://localhost:8100/currency-conversion-feign/from/EUR/to/TWD/quantity/10
@@ -120,7 +111,6 @@ curl http://localhost:8765/currency-conversion-new/from/USD/to/TWD/quantity/10
 #### Smoke Test
 
 ```bash
-curl http://localhost:8080/limits
 curl http://localhost:8000/currency-exchange/from/USD/to/TWD
 curl http://localhost:8765/currency-conversion-feign/from/USD/to/TWD/quantity/10
 ```
